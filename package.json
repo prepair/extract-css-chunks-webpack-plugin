@@ -69,8 +69,8 @@
     "loader-utils": "^1.1.0",
     "normalize-url": "1.9.1",
     "schema-utils": "^1.0.0",
-    "webpack-sources": "^1.1.0",
-    "webpack-external-import": "^0.0.1-beta.19"
+    "webpack-external-import": "^0.0.1-beta.19",
+    "webpack-sources": "^1.1.0"
   },
   "devDependencies": {
     "@babel/cli": "^7.5.0",
@@ -91,6 +91,7 @@
     "eslint": "^6.0.1",
     "eslint-config-prettier": "^6.0.0",
     "eslint-plugin-import": "^2.18.0",
+    "eslint-plugin-prettier": "^3.1.1",
     "file-loader": "^4.0.0",
     "husky": "^3.0.0",
     "jest": "^24.8.0",
