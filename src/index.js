@@ -126,6 +126,16 @@ class ExtractCssChunksPlugin {
         filename: DEFAULT_FILENAME,
         moduleFilename: () => this.options.filename || DEFAULT_FILENAME,
         ignoreOrder: false,
+        // note: that `processLinkHref` function will be stringified so the passed
+        //  in function should not rely on stuff found in outer scopes, use only
+        //  the parameter or globally available stuff like `window.x`
+        // note: here we are using a plain ES5 function as a default, cause we don't
+        //  know what env this code will be run
+        /* eslint-disable func-names, object-shorthand, prefer-template */
+        processLinkHref: function(x) {
+          return x;
+        },
+        /* eslint-enable func-names, object-shorthand, prefer-template */
       },
       options
     );
@@ -374,8 +384,9 @@ class ExtractCssChunksPlugin {
               Template.indent([
                 'promises.push(installedCssChunks[chunkId] = new Promise(function(resolve, reject) {',
                 Template.indent([
+                  `var processLinkHref = ${this.options.processLinkHref};`,
                   `var href = ${linkHrefPath};`,
-                  `var fullhref = ${mainTemplate.requireFn}.p + href;`,
+                  `var fullhref = processLinkHref(${mainTemplate.requireFn}.p + href);`,
                   'var existingLinkTags = document.getElementsByTagName("link");',
                   'for(var i = 0; i < existingLinkTags.length; i++) {',
                   Template.indent([
