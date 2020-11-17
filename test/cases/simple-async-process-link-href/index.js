@@ -1,5 +1,5 @@
 import './main.css';
 
-import('./async');
+import('./async').then(() => {});
 
-import('./async.css');
+import('./async.css').then(() => {});

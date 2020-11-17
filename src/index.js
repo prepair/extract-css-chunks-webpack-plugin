@@ -3,6 +3,11 @@
 import webpack from 'webpack';
 import sources from 'webpack-sources';
 
+import validateOptions from 'schema-utils';
+
+import CssDependency from './CssDependency';
+import schema from './plugin-options.json';
+
 const { ConcatSource, SourceMapSource, OriginalSource } = sources;
 const {
   Template,
@@ -18,27 +23,6 @@ const REGEXP_CONTENTHASH = /\[contenthash(?::(\d+))?\]/i;
 const REGEXP_NAME = /\[name\]/i;
 const REGEXP_PLACEHOLDERS = /\[(name|id|chunkhash)\]/g;
 const DEFAULT_FILENAME = '[name].css';
-
-class CssDependency extends webpack.Dependency {
-  constructor(
-    { identifier, content, media, sourceMap },
-    context,
-    identifierIndex
-  ) {
-    super();
-
-    this.identifier = identifier;
-    this.identifierIndex = identifierIndex;
-    this.content = content;
-    this.media = media;
-    this.sourceMap = sourceMap;
-    this.context = context;
-  }
-
-  getResourceIdentifier() {
-    return `css-module-${this.identifier}-${this.identifierIndex}`;
-  }
-}
 
 class CssDependencyTemplate {
   apply() {}
@@ -109,18 +93,16 @@ class CssModule extends webpack.Module {
 }
 
 class CssModuleFactory {
-  create(
-    {
-      dependencies: [dependency],
-    },
-    callback
-  ) {
+  create({ dependencies: [dependency] }, callback) {
     callback(null, new CssModule(dependency));
   }
 }
 
 class ExtractCssChunksPlugin {
   constructor(options = {}) {
+    validateOptions(schema, options, 'Mini CSS Extract Plugin');
+
+    const insert = options.insert ? options.insert.toString() : null;
     this.options = Object.assign(
       {
         filename: DEFAULT_FILENAME,
@@ -137,7 +119,8 @@ class ExtractCssChunksPlugin {
         },
         /* eslint-enable func-names, object-shorthand, prefer-template */
       },
-      options
+      options,
+      { insert }
     );
 
     if (!this.options.chunkFilename) {
@@ -158,30 +141,6 @@ class ExtractCssChunksPlugin {
 
   apply(compiler) {
     compiler.hooks.thisCompilation.tap(pluginName, (compilation) => {
-      compilation.hooks.normalModuleLoader.tap(pluginName, (lc, m) => {
-        const loaderContext = lc;
-        const module = m;
-
-        loaderContext[MODULE_TYPE] = (content) => {
-          if (!Array.isArray(content) && content != null) {
-            throw new Error(
-              `Exported value was not extracted as an array: ${JSON.stringify(
-                content
-              )}`
-            );
-          }
-
-          const identifierCountMap = new Map();
-
-          for (const line of content) {
-            const count = identifierCountMap.get(line.identifier) || 0;
-
-            module.addDependency(new CssDependency(line, m.context, count));
-            identifierCountMap.set(line.identifier, count + 1);
-          }
-        };
-      });
-
       compilation.dependencyFactories.set(
         CssDependency,
         new CssModuleFactory()
@@ -373,11 +332,14 @@ class ExtractCssChunksPlugin {
                 contentHashType: MODULE_TYPE,
               }
             );
-
+            const { insert } = this.options;
+            const supportsPreload =
+              '(function() { try { return document.createElement("link").relList.supports("preload"); } catch(e) { return false; }}());';
             return Template.asString([
               source,
               '',
               `// ${pluginName} CSS loading`,
+              `var supportsPreload = ${supportsPreload}`,
               `var cssChunks = ${JSON.stringify(chunkMap)};`,
               'if(installedCssChunks[chunkId]) promises.push(installedCssChunks[chunkId]);',
               'else if(installedCssChunks[chunkId] !== 0 && cssChunks[chunkId]) {',
@@ -392,7 +354,7 @@ class ExtractCssChunksPlugin {
                   Template.indent([
                     'var tag = existingLinkTags[i];',
                     'var dataHref = tag.getAttribute("data-href") || tag.getAttribute("href");',
-                    'if(tag.rel === "stylesheet" && (dataHref === href || dataHref === fullhref)) return resolve();',
+                    'if((tag.rel === "stylesheet" || tag.rel === "preload") && (dataHref === href || dataHref === fullhref)) return resolve();',
                   ]),
                   '}',
                   'var existingStyleTags = document.getElementsByTagName("style");',
@@ -404,8 +366,8 @@ class ExtractCssChunksPlugin {
                   ]),
                   '}',
                   'var linkTag = document.createElement("link");',
-                  'linkTag.rel = "stylesheet";',
-                  'linkTag.type = "text/css";',
+                  'linkTag.rel = supportsPreload ? "preload": "stylesheet";',
+                  'supportsPreload ? linkTag.as = "style" : linkTag.type = "text/css";',
                   'linkTag.onload = resolve;',
                   'linkTag.onerror = function(event) {',
                   Template.indent([
@@ -430,11 +392,23 @@ class ExtractCssChunksPlugin {
                         '}',
                       ])
                     : '',
-                  'var head = document.getElementsByTagName("head")[0];',
-                  'head.appendChild(linkTag);',
+                  insert
+                    ? `var insert = ${insert};\ninsert(linkTag);`
+                    : 'var head = document.getElementsByTagName("head")[0]; head.appendChild(linkTag)',
                 ]),
                 '}).then(function() {',
-                Template.indent(['installedCssChunks[chunkId] = 0;']),
+                Template.indent([
+                  'installedCssChunks[chunkId] = 0;',
+                  'if(supportsPreload) {',
+                  Template.indent([
+                    'var execLinkTag = document.createElement("link");',
+                    `execLinkTag.href =  ${mainTemplate.requireFn}.p + ${linkHrefPath};`,
+                    'execLinkTag.rel = "stylesheet";',
+                    'execLinkTag.type = "text/css";',
+                    'document.body.appendChild(execLinkTag);',
+                  ]),
+                  '}',
+                ]),
                 '}));',
               ]),
               '}',
@@ -470,6 +444,9 @@ class ExtractCssChunksPlugin {
     if (typeof chunkGroup.getModuleIndex2 === 'function') {
       // Store dependencies for modules
       const moduleDependencies = new Map(modules.map((m) => [m, new Set()]));
+      const moduleDependenciesReasons = new Map(
+        modules.map((m) => [m, new Map()])
+      );
 
       // Get ordered list of modules per chunk group
       // This loop also gathers dependencies from the ordered lists
@@ -489,9 +466,14 @@ class ExtractCssChunksPlugin {
 
         for (let i = 0; i < sortedModules.length; i++) {
           const set = moduleDependencies.get(sortedModules[i]);
+          const reasons = moduleDependenciesReasons.get(sortedModules[i]);
 
           for (let j = i + 1; j < sortedModules.length; j++) {
-            set.add(sortedModules[j]);
+            const module = sortedModules[j];
+            set.add(module);
+            const reason = reasons.get(module) || new Set();
+            reason.add(cg);
+            reasons.set(module, reason);
           }
         }
 
@@ -542,17 +524,37 @@ class ExtractCssChunksPlugin {
           // use list with fewest failed deps
           // and emit a warning
           const fallbackModule = bestMatch.pop();
+
           if (!this.options.ignoreOrder) {
+            const reasons = moduleDependenciesReasons.get(fallbackModule);
             compilation.warnings.push(
               new Error(
-                `chunk ${chunk.name || chunk.id} [${pluginName}]\n` +
-                  'Conflicting order between:\n' +
-                  ` * ${fallbackModule.readableIdentifier(
-                    requestShortener
-                  )}\n` +
-                  `${bestMatchDeps
-                    .map((m) => ` * ${m.readableIdentifier(requestShortener)}`)
-                    .join('\n')}`
+                [
+                  `chunk ${chunk.name || chunk.id} [${pluginName}]`,
+                  'Conflicting order. Following module has been added:',
+                  ` * ${fallbackModule.readableIdentifier(requestShortener)}`,
+                  'despite it was not able to fulfill desired ordering with these modules:',
+                  ...bestMatchDeps.map((m) => {
+                    const goodReasonsMap = moduleDependenciesReasons.get(m);
+                    const goodReasons =
+                      goodReasonsMap && goodReasonsMap.get(fallbackModule);
+                    const failedChunkGroups = Array.from(
+                      reasons.get(m),
+                      (cg) => cg.name
+                    ).join(', ');
+                    const goodChunkGroups =
+                      goodReasons &&
+                      Array.from(goodReasons, (cg) => cg.name).join(', ');
+                    return [
+                      ` * ${m.readableIdentifier(requestShortener)}`,
+                      `   - couldn't fulfill desired order of chunk group(s) ${failedChunkGroups}`,
+                      goodChunkGroups &&
+                        `   - while fulfilling desired order of chunk group(s) ${goodChunkGroups}`,
+                    ]
+                      .filter(Boolean)
+                      .join('\n');
+                  }),
+                ].join('\n')
               )
             );
           }
@@ -563,7 +565,7 @@ class ExtractCssChunksPlugin {
     } else {
       // fallback for older webpack versions
       // (to avoid a breaking change)
-      // TODO remove this in next mayor version
+      // TODO remove this in next major version
       // and increase minimum webpack version to 4.12.0
       modules.sort((a, b) => a.index2 - b.index2);
       usedModules = modules;

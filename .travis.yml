@@ -1,9 +1,13 @@
 sudo: false
 language: node_js
 node_js:
-  - stable
+  - v10
+before_script:
+  - nvm use v8
+  - yarn --ignore-engines
 script:
-  - echo success
+  - yarn lint
+  - yarn test
 after_success:
   - npm run semantic-release
 branches:
@@ -14,6 +18,6 @@ notifications:
   webhooks:
     urls:
       - https://webhooks.gitter.im/e/5156be73e058008e1ed2
-    on_success: always  # options: [always|never|change] default: always
-    on_failure: always  # options: [always|never|change] default: always
-    on_start: never     # options: [always|never|change] default: always
+    on_success: always # options: [always|never|change] default: always
+    on_failure: always # options: [always|never|change] default: always
+    on_start: never # options: [always|never|change] default: always

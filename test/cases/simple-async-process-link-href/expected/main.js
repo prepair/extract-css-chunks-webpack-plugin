@@ -82,6 +82,7 @@
 /******/
 /******/
 /******/ 		// extract-css-chunks-webpack-plugin CSS loading
+/******/ 		var supportsPreload = (function() { try { return document.createElement("link").relList.supports("preload"); } catch(e) { return false; }}());
 /******/ 		var cssChunks = {"1":1,"2":1};
 /******/ 		if(installedCssChunks[chunkId]) promises.push(installedCssChunks[chunkId]);
 /******/ 		else if(installedCssChunks[chunkId] !== 0 && cssChunks[chunkId]) {
@@ -90,12 +91,12 @@
 /******/ 				      return x + '.dummy';
 /******/ 				    };
 /******/ 				var href = "" + ({}[chunkId]||chunkId) + ".css";
-/******/ 				var fullhref = processLinkHref(__webpack_require__.p + href;)
+/******/ 				var fullhref = processLinkHref(__webpack_require__.p + href);
 /******/ 				var existingLinkTags = document.getElementsByTagName("link");
 /******/ 				for(var i = 0; i < existingLinkTags.length; i++) {
 /******/ 					var tag = existingLinkTags[i];
 /******/ 					var dataHref = tag.getAttribute("data-href") || tag.getAttribute("href");
-/******/ 					if(tag.rel === "stylesheet" && (dataHref === href || dataHref === fullhref)) return resolve();
+/******/ 					if((tag.rel === "stylesheet" || tag.rel === "preload") && (dataHref === href || dataHref === fullhref)) return resolve();
 /******/ 				}
 /******/ 				var existingStyleTags = document.getElementsByTagName("style");
 /******/ 				for(var i = 0; i < existingStyleTags.length; i++) {
@@ -104,8 +105,8 @@
 /******/ 					if(dataHref === href || dataHref === fullhref) return resolve();
 /******/ 				}
 /******/ 				var linkTag = document.createElement("link");
-/******/ 				linkTag.rel = "stylesheet";
-/******/ 				linkTag.type = "text/css";
+/******/ 				linkTag.rel = supportsPreload ? "preload": "stylesheet";
+/******/ 				supportsPreload ? linkTag.as = "style" : linkTag.type = "text/css";
 /******/ 				linkTag.onload = resolve;
 /******/ 				linkTag.onerror = function(event) {
 /******/ 					var request = event && event.target && event.target.src || fullhref;
@@ -118,10 +119,16 @@
 /******/ 				};
 /******/ 				linkTag.href = fullhref;
 /******/
-/******/ 				var head = document.getElementsByTagName("head")[0];
-/******/ 				head.appendChild(linkTag);
+/******/ 				var head = document.getElementsByTagName("head")[0]; head.appendChild(linkTag)
 /******/ 			}).then(function() {
 /******/ 				installedCssChunks[chunkId] = 0;
+/******/ 				if(supportsPreload) {
+/******/ 					var execLinkTag = document.createElement("link");
+/******/ 					execLinkTag.href =  __webpack_require__.p + "" + ({}[chunkId]||chunkId) + ".css";
+/******/ 					execLinkTag.rel = "stylesheet";
+/******/ 					execLinkTag.type = "text/css";
+/******/ 					document.body.appendChild(execLinkTag);
+/******/ 				}
 /******/ 			}));
 /******/ 		}
 /******/
@@ -258,9 +265,9 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _main_css__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(_main_css__WEBPACK_IMPORTED_MODULE_0__);
 
 
-__webpack_require__.e(/* import() */ 1).then(__webpack_require__.bind(null, 2));
+__webpack_require__.e(/* import() */ 1).then(__webpack_require__.bind(null, 2)).then(() => {});
 
-__webpack_require__.e(/* import() */ 2).then(__webpack_require__.t.bind(null, 4, 7));
+__webpack_require__.e(/* import() */ 2).then(__webpack_require__.t.bind(null, 4, 7)).then(() => {});
 
 
 /***/ }),
