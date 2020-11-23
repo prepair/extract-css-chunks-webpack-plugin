@@ -113,11 +113,11 @@ class ExtractCssChunksPlugin {
         //  the parameter or globally available stuff like `window.x`
         // note: here we are using a plain ES5 function as a default, cause we don't
         //  know what env this code will be run
-        /* eslint-disable func-names, object-shorthand, prefer-template */
+        /* eslint-disable func-names, object-shorthand */
         processLinkHref: function(x) {
           return x;
         },
-        /* eslint-enable func-names, object-shorthand, prefer-template */
+        /* eslint-enable func-names, object-shorthand */
       },
       options,
       { insert }
@@ -332,7 +332,7 @@ class ExtractCssChunksPlugin {
                 contentHashType: MODULE_TYPE,
               }
             );
-            const { insert } = this.options;
+            const { insert, processLinkHref } = this.options;
             const supportsPreload =
               '(function() { try { return document.createElement("link").relList.supports("preload"); } catch(e) { return false; }}());';
             return Template.asString([
@@ -341,12 +341,12 @@ class ExtractCssChunksPlugin {
               `// ${pluginName} CSS loading`,
               `var supportsPreload = ${supportsPreload}`,
               `var cssChunks = ${JSON.stringify(chunkMap)};`,
+              `var processLinkHref = ${processLinkHref};`,
               'if(installedCssChunks[chunkId]) promises.push(installedCssChunks[chunkId]);',
               'else if(installedCssChunks[chunkId] !== 0 && cssChunks[chunkId]) {',
               Template.indent([
                 'promises.push(installedCssChunks[chunkId] = new Promise(function(resolve, reject) {',
                 Template.indent([
-                  `var processLinkHref = ${this.options.processLinkHref};`,
                   `var href = ${linkHrefPath};`,
                   `var fullhref = processLinkHref(${mainTemplate.requireFn}.p + href);`,
                   'var existingLinkTags = document.getElementsByTagName("link");',
@@ -402,7 +402,7 @@ class ExtractCssChunksPlugin {
                   'if(supportsPreload) {',
                   Template.indent([
                     'var execLinkTag = document.createElement("link");',
-                    `execLinkTag.href =  ${mainTemplate.requireFn}.p + ${linkHrefPath};`,
+                    `execLinkTag.href = processLinkHref(${mainTemplate.requireFn}.p + ${linkHrefPath});`,
                     'execLinkTag.rel = "stylesheet";',
                     'execLinkTag.type = "text/css";',
                     'document.body.appendChild(execLinkTag);',

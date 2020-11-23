@@ -84,12 +84,12 @@
 /******/ 		// extract-css-chunks-webpack-plugin CSS loading
 /******/ 		var supportsPreload = (function() { try { return document.createElement("link").relList.supports("preload"); } catch(e) { return false; }}());
 /******/ 		var cssChunks = {"1":1,"2":1};
+/******/ 		var processLinkHref = function (x) {
+/******/ 		      return x + '.dummy';
+/******/ 		    };
 /******/ 		if(installedCssChunks[chunkId]) promises.push(installedCssChunks[chunkId]);
 /******/ 		else if(installedCssChunks[chunkId] !== 0 && cssChunks[chunkId]) {
 /******/ 			promises.push(installedCssChunks[chunkId] = new Promise(function(resolve, reject) {
-/******/ 				var processLinkHref = function (x) {
-/******/ 				      return x + '.dummy';
-/******/ 				    };
 /******/ 				var href = "" + ({}[chunkId]||chunkId) + ".css";
 /******/ 				var fullhref = processLinkHref(__webpack_require__.p + href);
 /******/ 				var existingLinkTags = document.getElementsByTagName("link");
@@ -124,7 +124,7 @@
 /******/ 				installedCssChunks[chunkId] = 0;
 /******/ 				if(supportsPreload) {
 /******/ 					var execLinkTag = document.createElement("link");
-/******/ 					execLinkTag.href =  __webpack_require__.p + "" + ({}[chunkId]||chunkId) + ".css";
+/******/ 					execLinkTag.href = processLinkHref(__webpack_require__.p + "" + ({}[chunkId]||chunkId) + ".css");
 /******/ 					execLinkTag.rel = "stylesheet";
 /******/ 					execLinkTag.type = "text/css";
 /******/ 					document.body.appendChild(execLinkTag);
